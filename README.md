@@ -1,34 +1,135 @@
-# OVM IHEXON BRANCH
+# revm
 
-# 业务使用
+A lightweight Linux VM launcher for macOS, powered by [libkrun](https://github.com/containers/libkrun) and Apple's Hypervisor.framework. Launch a Linux shell in under a second.
 
-## 初始化虚拟机
+## Features
 
+- **Fast startup** - Enter a Linux shell in ~1 second, no heavy VM overhead
+- **Zero configuration** - No system modifications, no daemons, just run
+- **Docker/Podman compatible** - Full Docker CLI compatibility via built-in Podman
+- **Two execution modes** - Rootfs mode for direct Linux execution, Container mode for Docker workflows
+- **Disk mounting** - Mount virtual disk images (ext4/btrfs/xfs) into the guest
+- **Directory sharing** - Share host directories with the guest via VirtIO-FS
+- **Multi-terminal** - Attach multiple terminals to a running instance via SSH
+- **Proxy passthrough** - Inherit host proxy settings in the guest
+
+## Requirements
+
+- macOS 13.1+ (Ventura or later)
+- Apple Silicon (ARM64)
+
+## Installation
+
+```bash
+# Download the latest release
+wget https://github.com/ihexon/revm/releases/latest/download/revm.tar.zst
+
+# Remove quarantine attribute (required for downloaded binaries)
+xattr -d com.apple.quarantine revm.tar.zst
+
+# Extract
+tar -xvf revm.tar.zst
+
+# Run
+./out/bin/revm --help
 ```
-./ovm-arm64 --workspace=/Users/danhexon/myvm/  \
-    machine init --bootable-image \
-       /Users/danhexon/alpine_virt/alpine_krunkit.raw.xz@2.0 \
-       --external-disk=/Users/danhexon/alpine_virt/mydisk.raw@2.0
+
+## Quick Start
+
+### Rootfs Mode
+
+Run commands directly in a Linux rootfs:
+
+```bash
+# Download Alpine Linux rootfs
+mkdir alpine && cd alpine
+wget -qO- https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/aarch64/alpine-minirootfs-3.21.3-aarch64.tar.gz | tar -xz
+cd ..
+
+# Launch a shell
+revm rootfs-mode --rootfs ./alpine -- /bin/sh
+
+# Or run a specific command
+revm rootfs-mode --rootfs ./alpine -- /bin/echo "Hello from Linux!"
 ```
 
-- workspace 指定数据存储的地方，所有的文件将会被存储在这里，这个参数作为 root 参数对所有的子命令都可见
-- machine init 定义了行为，该阶段的行为是初始化虚拟机
-- bootable-image 是 machine init 的参数，指定了虚拟机的镜像，该镜像是一个可启动的参数
-- report-url 将程序关键的 event 发送给一个 url，这个 url 可以说 unix socks, 也可以是 `tcp://[ip]:[port]`
+### Container Mode
 
-## 启动虚拟机
+Run Docker/Podman containers with persistent storage:
+
+```bash
+# Start container engine (creates data.disk if not exists)
+revm docker-mode --data-storage ~/data.disk
+
+# In another terminal, use Docker CLI
+export DOCKER_HOST=unix:///tmp/docker_api.sock
+docker run --rm alpine echo "Hello from container!"
+
+# Or use Podman CLI
+export CONTAINER_HOST=unix:///tmp/docker_api.sock
+podman run --rm alpine echo "Hello from container!"
 ```
-ovm-arm64 --workspace /Users/danhexon/myvm \
-    machine start \
-    --ppid [PPID]
+
+### Attach to Running Instance
+
+```bash
+# Attach a new terminal to a running VM
+revm attach ./alpine -- /bin/sh
+
+# Run a command in the running VM
+revm attach ./alpine -- cat /etc/os-release
 ```
-- ppid 指定一个 PPID，等待这个PPID 消失，虚拟机也会关闭，如果你不指定，**如果不指定 twinpid ，那么 twinpid 是当前进程的 PPID**
 
+## Advanced Usage
 
-## REST API
-默认在 `$workspace/tmp/ovm_restapi.socks`
+### Mount Disk Images
 
-- /apiversion      获取虚拟机VERSION 
-- /{name}/info     获取虚拟机配置信息
-- /{name}/vmstat   获取虚拟机运行状态
-- /{name}/synctime 同步主机时间到虚拟机
+Mount ext4/btrfs/xfs disk images into the guest:
+
+```bash
+# Create a disk image (if needed)
+truncate -s 10G data.disk
+
+# Mount disk images (auto-mounted at /var/tmp/mnt/...)
+revm rootfs-mode --rootfs ./alpine \
+  --data-disk ~/data1.disk \
+  --data-disk ~/data2.disk \
+  -- /bin/sh
+```
+
+### Share Host Directories
+
+Mount host directories into the guest via VirtIO-FS:
+
+```bash
+# Mount host directory to guest path
+revm rootfs-mode --rootfs ./alpine \
+  --mount /Users/me/projects:/mnt/projects \
+  -- /bin/sh
+```
+
+### Proxy Passthrough
+
+Inherit the host's HTTP/HTTPS proxy settings:
+
+```bash
+revm rootfs-mode --rootfs ./alpine --system-proxy -- /bin/sh
+```
+
+### Resource Configuration
+
+```bash
+# Customize CPU and memory
+revm rootfs-mode --rootfs ./alpine \
+  --cpus 4 \
+  --memory 4096 \
+  -- /bin/sh
+```
+
+## Bug Reports
+
+https://github.com/ihexon/revm/issues
+
+## License
+
+See [LICENSE](./LICENSE) for details.

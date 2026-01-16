@@ -1,2 +1,0 @@
-tcpclient := NewNetworkClient("tcp").get("1227.0.0.1:8080/hello").getRespone()
-tcpclient := NewNetworkClient("udf").get("/hello").getRespone()
